@@ -1,117 +1,129 @@
 #include <SFML/Graphics.hpp>
-#include <cstdlib>
+#include <iostream>
 #include <ctime>
-
 using namespace sf;
 
-const int WIDTH = 640;
-const int HEIGHT = 480;
-const float PLAYER_SPEED = 200.f;
-const float ENEMY_SPEED = 100.f;
-const int ENEMY_SPAWN_INTERVAL = 1000;
-const int MAX_ENEMIES = 10;
+const int windowWidth = 800;
+const int windowHeight = 600;
+const int playerSize = 50;
+const int groundHeight = 50;
+
+class Player
+{
+public:
+    RectangleShape shape;
+    Player()
+    {
+        shape.setSize(Vector2f(playerSize, playerSize));
+        shape.setFillColor(Color::Green);
+        shape.setPosition(windowWidth / 2, windowHeight / 2);
+    }
+    void moveLeft()
+    {
+        if (shape.getPosition().x > 0)
+            shape.move(-10.f, 0.f);
+    }
+    void moveRight()
+    {
+        if (shape.getPosition().x < windowWidth - playerSize)
+            shape.move(10.f, 0.f);
+    }
+    void moveUp()
+    {
+        if (shape.getPosition().y > 0)
+            shape.move(0.f, -10.f);
+    }
+    void moveDown()
+    {
+        if (shape.getPosition().y < windowHeight - playerSize - groundHeight)
+            shape.move(0.f, 10.f);
+    }
+};
+
+class Ground
+{
+public:
+    RectangleShape shape;
+    Ground()
+    {
+        shape.setSize(Vector2f(windowWidth, groundHeight));
+        shape.setFillColor(Color::Black);
+        shape.setPosition(0.f, windowHeight - groundHeight);
+    }
+};
+
+class Rock
+{
+public:
+    RectangleShape shape;
+    Rock(float x)
+    {
+        shape.setSize(Vector2f(playerSize, playerSize));
+        shape.setFillColor(Color::Red);
+        shape.setPosition(x, 0.f);
+    }
+    void update()
+    {
+        shape.move(0.f, 5.f);
+    }
+};
 
 int main()
 {
-    // Set up the game window
-    RenderWindow window(VideoMode(WIDTH, HEIGHT), "DIGJAM Game");
+    srand(time(NULL));
+    RenderWindow window(VideoMode(windowWidth, windowHeight), "Digjam Game");
     window.setFramerateLimit(60);
 
-    // Load game assets
-    Texture playerTexture;
-    playerTexture.loadFromFile("player.png");
-    Sprite player(playerTexture);
-    player.setPosition(WIDTH / 2, HEIGHT - player.getGlobalBounds().height / 2);
+    Player player;
+    Ground ground;
+    std::vector<Rock> rocks;
 
-    Texture enemyTexture;
-    enemyTexture.loadFromFile("enemy.png");
-    Sprite enemies[MAX_ENEMIES];
-
-    Font font;
-    font.loadFromFile("font.ttf");
-    Text scoreText("", font, 30);
-    scoreText.setFillColor(Color::White);
-    scoreText.setPosition(10.f, 10.f);
     int score = 0;
+    Font font;
+    if (!font.loadFromFile("arial.ttf"))
+        std::cout << "Font load error!" << std::endl;
+    Text scoreText;
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(30);
+    scoreText.setPosition(20.f, 20.f);
 
-    // Set up the game clock and enemy spawning timer
     Clock clock;
-    int enemySpawnTimer = 0;
-
     while (window.isOpen())
     {
-        // Handle events
         Event event;
         while (window.pollEvent(event))
         {
             if (event.type == Event::Closed)
+                window.close();
+        }
+
+        if (clock.getElapsedTime().asSeconds() > 1.f)
+        {
+            float x = (rand() % (windowWidth - playerSize));
+            Rock rock(x);
+            rocks.push_back(rock);
+            clock.restart();
+        }
+
+        for (int i = 0; i < rocks.size(); i++)
+        {
+            rocks[i].update();
+            if (rocks[i].shape.getPosition().y > windowHeight - groundHeight - playerSize &&
+                rocks[i].shape.getPosition().x > player.shape.getPosition().x - playerSize &&
+                rocks[i].shape.getPosition().x < player.shape.getPosition().x + playerSize)
             {
                 window.close();
+                std::cout << "Game Over! Score: " << score << std::endl;
             }
         }
 
-        // Update the game
-        float deltaTime = clock.restart().asSeconds();
-
-        // Move the player
         if (Keyboard::isKeyPressed(Keyboard::Left))
-        {
-            player.move(-PLAYER_SPEED * deltaTime, 0.f);
-        }
-        else if (Keyboard::isKeyPressed(Keyboard::Right))
-        {
-            player.move(PLAYER_SPEED * deltaTime, 0.f);
-        }
+            player.moveLeft();
+        if (Keyboard::isKeyPressed(Keyboard::Right))
+            player.moveRight();
+        if (Keyboard::isKeyPressed(Keyboard::Up))
+            player.moveUp();
+        if (Keyboard::isKeyPressed(Keyboard::Down))
+            player.moveDown();
 
-        // Spawn enemies
-        enemySpawnTimer += clock.getElapsedTime().asMilliseconds();
-        if (enemySpawnTimer >= ENEMY_SPAWN_INTERVAL)
-        {
-            for (int i = 0; i < MAX_ENEMIES; i++)
-            {
-                if (enemies[i].getPosition().y == 0.f)
-                {
-                    enemies[i].setTexture(enemyTexture);
-                    enemies[i].setPosition(rand() % WIDTH, 0.f);
-                    break;
-                }
-            }
-            enemySpawnTimer = 0;
-        }
-
-        // Move the enemies
-        for (int i = 0; i < MAX_ENEMIES; i++)
-        {
-            if (enemies[i].getPosition().y > HEIGHT)
-            {
-                enemies[i].setPosition(0.f, 0.f);
-            }
-            else
-            {
-                enemies[i].move(0.f, ENEMY_SPEED * deltaTime);
-            }
-        }
-
-        // Detect collisions
-        for (int i = 0; i < MAX_ENEMIES; i++)
-        {
-            if (player.getGlobalBounds().intersects(enemies[i].getGlobalBounds()))
-            {
-                score--;
-                enemies[i].setPosition(0.f, 0.f);
-            }
-        }
-
-        // Update the score
-        scoreText.setString("Score: " + std::to_string(score));
-
-        // Check game over condition
-        if (score < -10)
-        {
-            window.close();
-        }
-
-        // Draw the game
-        window.clear(Color::Black);
-        window.draw(player);
-        for (int i = 0; i < MAX_EN
+       
