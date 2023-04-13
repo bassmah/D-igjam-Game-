@@ -1,0 +1,117 @@
+#include <SFML/Graphics.hpp>
+#include <cstdlib>
+#include <ctime>
+
+using namespace sf;
+
+const int WIDTH = 640;
+const int HEIGHT = 480;
+const float PLAYER_SPEED = 200.f;
+const float ENEMY_SPEED = 100.f;
+const int ENEMY_SPAWN_INTERVAL = 1000;
+const int MAX_ENEMIES = 10;
+
+int main()
+{
+    // Set up the game window
+    RenderWindow window(VideoMode(WIDTH, HEIGHT), "DIGJAM Game");
+    window.setFramerateLimit(60);
+
+    // Load game assets
+    Texture playerTexture;
+    playerTexture.loadFromFile("player.png");
+    Sprite player(playerTexture);
+    player.setPosition(WIDTH / 2, HEIGHT - player.getGlobalBounds().height / 2);
+
+    Texture enemyTexture;
+    enemyTexture.loadFromFile("enemy.png");
+    Sprite enemies[MAX_ENEMIES];
+
+    Font font;
+    font.loadFromFile("font.ttf");
+    Text scoreText("", font, 30);
+    scoreText.setFillColor(Color::White);
+    scoreText.setPosition(10.f, 10.f);
+    int score = 0;
+
+    // Set up the game clock and enemy spawning timer
+    Clock clock;
+    int enemySpawnTimer = 0;
+
+    while (window.isOpen())
+    {
+        // Handle events
+        Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == Event::Closed)
+            {
+                window.close();
+            }
+        }
+
+        // Update the game
+        float deltaTime = clock.restart().asSeconds();
+
+        // Move the player
+        if (Keyboard::isKeyPressed(Keyboard::Left))
+        {
+            player.move(-PLAYER_SPEED * deltaTime, 0.f);
+        }
+        else if (Keyboard::isKeyPressed(Keyboard::Right))
+        {
+            player.move(PLAYER_SPEED * deltaTime, 0.f);
+        }
+
+        // Spawn enemies
+        enemySpawnTimer += clock.getElapsedTime().asMilliseconds();
+        if (enemySpawnTimer >= ENEMY_SPAWN_INTERVAL)
+        {
+            for (int i = 0; i < MAX_ENEMIES; i++)
+            {
+                if (enemies[i].getPosition().y == 0.f)
+                {
+                    enemies[i].setTexture(enemyTexture);
+                    enemies[i].setPosition(rand() % WIDTH, 0.f);
+                    break;
+                }
+            }
+            enemySpawnTimer = 0;
+        }
+
+        // Move the enemies
+        for (int i = 0; i < MAX_ENEMIES; i++)
+        {
+            if (enemies[i].getPosition().y > HEIGHT)
+            {
+                enemies[i].setPosition(0.f, 0.f);
+            }
+            else
+            {
+                enemies[i].move(0.f, ENEMY_SPEED * deltaTime);
+            }
+        }
+
+        // Detect collisions
+        for (int i = 0; i < MAX_ENEMIES; i++)
+        {
+            if (player.getGlobalBounds().intersects(enemies[i].getGlobalBounds()))
+            {
+                score--;
+                enemies[i].setPosition(0.f, 0.f);
+            }
+        }
+
+        // Update the score
+        scoreText.setString("Score: " + std::to_string(score));
+
+        // Check game over condition
+        if (score < -10)
+        {
+            window.close();
+        }
+
+        // Draw the game
+        window.clear(Color::Black);
+        window.draw(player);
+        for (int i = 0; i < MAX_EN
